@@ -31,7 +31,7 @@ async function verificarTransacciones() {
           wallet: walletCliente,
           tokens: tokens,
           tx_hash: txHash,
-          proyecto_id: 1 // <-- REEMPLAZA ESTE ID POR EL CORRECTO DE TU PROYECTO
+          proyecto_id: 395 // <-- REEMPLAZA ESTE ID POR EL CORRECTO DE TU PROYECTO
         });
 
         if (registro.status === 200 && registro.data.success) {
