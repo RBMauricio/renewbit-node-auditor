@@ -11,7 +11,7 @@ const contratoABI = require("./abi.json");
 
 const contratoRB = new web3.eth.Contract(contratoABI, contratoAddress);
 
-const urlReserva = "https://renewbit.cl/wp-json/api-reservar-inversion/";
+const urlReserva = "https://renewbit.cl/wp-json/renewbit-api/reservar/";
 const urlRegistro = "https://renewbit.cl/wp-json/api/registrar-inversion/";
 
 let ultimoBloque = 0;
