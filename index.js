@@ -4,14 +4,13 @@ const axios = require("axios");
 
 const web3 = new Web3(`https://sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`);
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY;
-const direccionEmpresa = process.env.EMPRESA_WALLET;
+const direccionEmpresa = process.env.EMPRESA_WALLET.toLowerCase();
 const clavePrivada = process.env.EMPRESA_PRIVATE_KEY;
 const contratoAddress = process.env.CONTRATO_TOKEN;
 const contratoABI = require("./abi.json");
 
 const contratoRB = new web3.eth.Contract(contratoABI, contratoAddress);
 
-// URLs del sitio WordPress
 const urlReserva = "https://renewbit.cl/wp-json/api-reservar-inversion/";
 const urlRegistro = "https://renewbit.cl/wp-json/api/registrar-inversion/";
 
@@ -19,7 +18,7 @@ let ultimoBloque = 0;
 
 async function obtenerTransacciones() {
   try {
-    const { data } = await axios.get(`https://api-sepolia.etherscan.io/api`, {
+    const { data } = await axios.get("https://api-sepolia.etherscan.io/api", {
       params: {
         module: "account",
         action: "txlist",
@@ -30,11 +29,11 @@ async function obtenerTransacciones() {
       }
     });
 
-    const transacciones = data.result.filter(tx => tx.to?.toLowerCase() === direccionEmpresa.toLowerCase());
+    const transacciones = data.result.filter(
+      (tx) => tx.to?.toLowerCase() === direccionEmpresa && tx.isError === "0" && parseInt(tx.value) > 0
+    );
 
     for (const tx of transacciones) {
-      if (parseInt(tx.value) === 0 || tx.isError !== "0") continue;
-
       const wallet = tx.from.toLowerCase();
       const valorETH = web3.utils.fromWei(tx.value, "ether");
       const tokensComprados = Math.floor(parseFloat(valorETH) / 0.001); // 1 token = 0.001 ETH
@@ -46,8 +45,8 @@ async function obtenerTransacciones() {
       try {
         const respuesta = await axios.get(`${urlReserva}?wallet=${wallet}`);
         datosReserva = respuesta.data;
-      } catch (err) {
-        console.warn(`⚠️ No se pudo consultar la reserva para ${wallet}.`);
+      } catch {
+        console.warn(`⚠️ No se pudo consultar la reserva para ${wallet}`);
         continue;
       }
 
@@ -57,7 +56,7 @@ async function obtenerTransacciones() {
         !datosReserva.proyecto_id ||
         parseInt(datosReserva.tokens) !== tokensComprados
       ) {
-        console.warn(`⚠️ No se encontró reserva válida para ${wallet} o los tokens no coinciden. Transacción ignorada.`);
+        console.warn(`⚠️ No se encontró reserva válida para ${wallet} o los tokens no coinciden.`);
         continue;
       }
 
@@ -71,14 +70,14 @@ async function obtenerTransacciones() {
         data: txData
       });
 
-      const tx = {
+      const txObject = {
         from: cuenta.address,
         to: contratoAddress,
         data: txData,
         gas
       };
 
-      const signedTx = await web3.eth.accounts.signTransaction(tx, clavePrivada);
+      const signedTx = await web3.eth.accounts.signTransaction(txObject, clavePrivada);
       const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
       console.log(`✔ Tokens enviados: TX ${receipt.transactionHash}`);
 
@@ -98,16 +97,16 @@ async function obtenerTransacciones() {
           console.error("❌ Error al registrar inversión:", registrar.data);
         }
       } catch (error) {
-        console.error("❌ Error al enviar tokens o registrar inversión:", error.message || error);
+        console.error("❌ Error al enviar tokens o registrar inversión:", error.message);
       }
     }
 
     if (transacciones.length > 0) {
-      ultimoBloque = Math.max(...transacciones.map(tx => parseInt(tx.blockNumber))) + 1;
+      ultimoBloque = Math.max(...transacciones.map((tx) => parseInt(tx.blockNumber))) + 1;
     }
   } catch (error) {
     console.error("❌ Error en el proceso:", error.message || error);
   }
 }
 
-setInterval(obtenerTransacciones, 15000); // Cada 15 segundos
+setInterval(obtenerTransacciones, 15000);
