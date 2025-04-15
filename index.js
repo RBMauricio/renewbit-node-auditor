@@ -28,7 +28,6 @@ async function verificarTransacciones() {
       try {
         const decimals = await contract.methods.decimals().call();
         const cantidad = BigInt(tokens) * BigInt(10) ** BigInt(decimals);
-
         const gasPrice = await web3.eth.getGasPrice();
         const adjustedGasPrice = web3.utils.toBN(gasPrice).add(web3.utils.toBN(web3.utils.toWei('2', 'gwei')));
         const nonce = await web3.eth.getTransactionCount(walletEmpresa, "pending");
@@ -44,7 +43,6 @@ async function verificarTransacciones() {
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
         console.log(`✔ Tokens enviados: TX ${receipt.transactionHash}`);
 
-        // Registrar en WordPress
         await axios.post(apiUrlWordpress, {
           wallet: walletCliente,
           tokens: tokens,

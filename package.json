@@ -1,7 +1,7 @@
 {
-  "name": "renewbit-node-auditor",
+  "name": "renewbit-token-auditor",
   "version": "1.0.0",
-  "description": "Auditor automático para inversiones tokenizadas de RenewBit",
+  "description": "Auditor de pagos Sepolia para envío de tokens RB001",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
