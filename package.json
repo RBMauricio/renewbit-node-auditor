@@ -1,0 +1,14 @@
+{
+  "name": "renewbit-node-auditor",
+  "version": "1.0.0",
+  "description": "Auditor automático para inversiones tokenizadas de RenewBit",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.3",
+    "web3": "^1.10.0"
+  }
+}
