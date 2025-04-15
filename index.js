@@ -8,12 +8,6 @@ const ABI = require('./config/abi.json');
 const web3 = new Web3(new Web3.providers.HttpProvider(redRPC));
 const contract = new web3.eth.Contract(ABI, contratoRB);
 
-// Mapa temporal de wallets asociadas a proyectos (puedes ampliarlo)
-const proyectosAsociados = {
-  "0xe3bba0e363f723aae663667a2407097d65ee0508": 101,
-  "0x2031832e54a2200bf678286f560f49a950db2ad5": 102
-};
-
 async function verificarTransacciones() {
   const apiKey = process.env.API_KEY_ETHERSCAN;
   const url = `https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${walletEmpresa}&sort=desc&apikey=${apiKey}`;
@@ -22,26 +16,36 @@ async function verificarTransacciones() {
 
   for (const tx of transacciones) {
     if (tx.to.toLowerCase() === walletEmpresa.toLowerCase() && tx.value > 0 && tx.isError === "0") {
-      const walletCliente = tx.from;
+      const walletCliente = tx.from.toLowerCase();
       const txHash = tx.hash;
       const montoETH = parseFloat(web3.utils.fromWei(tx.value, 'ether'));
       const tokens = Math.floor(montoETH / 0.001);
       const yaProcesado = fs.existsSync(`logs/${txHash}.json`);
       if (yaProcesado) continue;
 
-      const proyecto_id = proyectosAsociados[walletCliente.toLowerCase()] || 1;
+      console.log(`✔ Pago detectado: ${tokens} tokens desde ${walletCliente}`);
 
-      const payload = {
-        wallet: walletCliente,
-        tokens: tokens,
-        tx_hash: txHash,
-        proyecto_id: proyecto_id
-      };
-
-      console.log("📤 Enviando payload a WordPress:");
-      console.log(payload);
-
+      // Verificar si existe una reserva válida
       try {
+        const reserva = await axios.get(`https://renewbit.cl/wp-json/api/reservar-inversion/?wallet=${walletCliente}`);
+        if (!reserva.data || reserva.data.tokens !== tokens) {
+          console.warn(`⚠️ No se encontró reserva válida para ${walletCliente} o los tokens no coinciden. Transacción ignorada.`);
+          continue;
+        }
+
+        const proyecto_id = reserva.data.proyecto_id;
+
+        // Confirmar registro en WordPress
+        const payload = {
+          wallet: walletCliente,
+          tokens: tokens,
+          tx_hash: txHash,
+          proyecto_id: proyecto_id
+        };
+
+        console.log("📤 Enviando payload a WordPress:");
+        console.log(payload);
+
         const registro = await axios.post(apiUrlWordpress, payload);
 
         if (registro.status === 200 && registro.data.success) {
@@ -72,10 +76,10 @@ async function verificarTransacciones() {
 
       } catch (err) {
         if (err.response) {
-          console.error("❌ Error en el POST a WordPress:", err.response.status);
+          console.error("❌ Error en la reserva o registro:", err.response.status);
           console.error("Detalles:", err.response.data);
         } else {
-          console.error("❌ Error al registrar o transferir:", err.message);
+          console.error("❌ Error general:", err.message);
         }
       }
     }
