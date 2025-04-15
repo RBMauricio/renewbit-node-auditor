@@ -25,26 +25,37 @@ async function verificarTransacciones() {
 
       console.log(`✔ Pago detectado: ${tokens} tokens desde ${walletCliente}`);
 
-      const decimals = await contract.methods.decimals().call();
-      const cantidad = BigInt(tokens) * BigInt(10) ** BigInt(decimals);
-      const signedTx = await web3.eth.accounts.signTransaction({
-        to: contratoRB,
-        data: contract.methods.transfer(walletCliente, cantidad).encodeABI(),
-        gas: 100000,
-        gasPrice: await web3.eth.getGasPrice()
-      }, process.env.PRIVATE_KEY);
+      try {
+        const decimals = await contract.methods.decimals().call();
+        const cantidad = BigInt(tokens) * BigInt(10) ** BigInt(decimals);
 
-      const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-      console.log(`✔ Tokens enviados: TX ${receipt.transactionHash}`);
+        const gasPrice = await web3.eth.getGasPrice();
+        const adjustedGasPrice = web3.utils.toBN(gasPrice).add(web3.utils.toBN(web3.utils.toWei('2', 'gwei')));
+        const nonce = await web3.eth.getTransactionCount(walletEmpresa, "pending");
 
-      await axios.post(apiUrlWordpress, {
-        wallet: walletCliente,
-        tokens: tokens,
-        tx_hash: txHash,
-        proyecto_id: 0
-      });
+        const signedTx = await web3.eth.accounts.signTransaction({
+          to: contratoRB,
+          data: contract.methods.transfer(walletCliente, cantidad).encodeABI(),
+          gas: 100000,
+          gasPrice: adjustedGasPrice.toString(),
+          nonce
+        }, process.env.PRIVATE_KEY);
 
-      fs.writeFileSync(`logs/${txHash}.json`, JSON.stringify({ status: "procesado", txHash, walletCliente }));
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        console.log(`✔ Tokens enviados: TX ${receipt.transactionHash}`);
+
+        // Registrar en WordPress
+        await axios.post(apiUrlWordpress, {
+          wallet: walletCliente,
+          tokens: tokens,
+          tx_hash: txHash,
+          proyecto_id: 0
+        });
+
+        fs.writeFileSync(`logs/${txHash}.json`, JSON.stringify({ status: "procesado", txHash, walletCliente }));
+      } catch (err) {
+        console.error("❌ Error al enviar tokens o registrar inversión:", err.message);
+      }
     }
   }
 }
