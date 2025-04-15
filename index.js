@@ -25,7 +25,7 @@ async function verificarTransacciones() {
 
       console.log(`✔ Pago detectado: ${tokens} tokens desde ${walletCliente}`);
 
-      // Verificar si existe una reserva válida
+      // Verificar si existe una reserva válida (ruta corregida)
       try {
         const reserva = await axios.get(`https://renewbit.cl/wp-json/api-reservar-inversion/?wallet=${walletCliente}`);
         if (!reserva.data || reserva.data.tokens !== tokens) {
