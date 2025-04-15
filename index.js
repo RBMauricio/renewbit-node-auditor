@@ -8,6 +8,12 @@ const ABI = require('./config/abi.json');
 const web3 = new Web3(new Web3.providers.HttpProvider(redRPC));
 const contract = new web3.eth.Contract(ABI, contratoRB);
 
+// Mapa temporal de wallets asociadas a proyectos (puedes ampliarlo)
+const proyectosAsociados = {
+  "0xe3bba0e363f723aae663667a2407097d65ee0508": 101,
+  "0x2031832e54a2200bf678286f560f49a950db2ad5": 102
+};
+
 async function verificarTransacciones() {
   const apiKey = process.env.API_KEY_ETHERSCAN;
   const url = `https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${walletEmpresa}&sort=desc&apikey=${apiKey}`;
@@ -23,16 +29,20 @@ async function verificarTransacciones() {
       const yaProcesado = fs.existsSync(`logs/${txHash}.json`);
       if (yaProcesado) continue;
 
-      console.log(`✔ Pago detectado: ${tokens} tokens desde ${walletCliente}`);
+      const proyecto_id = proyectosAsociados[walletCliente.toLowerCase()] || 1;
+
+      const payload = {
+        wallet: walletCliente,
+        tokens: tokens,
+        tx_hash: txHash,
+        proyecto_id: proyecto_id
+      };
+
+      console.log("📤 Enviando payload a WordPress:");
+      console.log(payload);
 
       try {
-        // 1. Validar primero en WordPress antes de enviar tokens
-        const registro = await axios.post(apiUrlWordpress, {
-          wallet: walletCliente,
-          tokens: tokens,
-          tx_hash: txHash,
-          proyecto_id: 395 // <-- REEMPLAZA ESTE ID POR EL CORRECTO DE TU PROYECTO
-        });
+        const registro = await axios.post(apiUrlWordpress, payload);
 
         if (registro.status === 200 && registro.data.success) {
           console.log("✔ Registro en WordPress exitoso, procediendo a enviar tokens...");
