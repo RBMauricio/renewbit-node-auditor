@@ -7,11 +7,11 @@ const etherscanApiKey = process.env.ETHERSCAN_API_KEY;
 const direccionEmpresa = process.env.EMPRESA_WALLET;
 const clavePrivada = process.env.EMPRESA_PRIVATE_KEY;
 const contratoAddress = process.env.CONTRATO_TOKEN;
-const abi = require("./abi.json");
+const contratoABI = require("./abi.json");
 
-const contratoRB = new web3.eth.Contract(abi, contratoAddress);
+const contratoRB = new web3.eth.Contract(contratoABI, contratoAddress);
 
-// 🚨 CONFIGURA AQUÍ EL ENDPOINT DE TU WEB WORDPRESS:
+// URLs del sitio WordPress
 const urlReserva = "https://renewbit.cl/wp-json/api-reservar-inversion/";
 const urlRegistro = "https://renewbit.cl/wp-json/api/registrar-inversion/";
 
@@ -37,13 +37,19 @@ async function obtenerTransacciones() {
 
       const wallet = tx.from.toLowerCase();
       const valorETH = web3.utils.fromWei(tx.value, "ether");
-      const tokensComprados = Math.floor(parseFloat(valorETH) / 0.001);
+      const tokensComprados = Math.floor(parseFloat(valorETH) / 0.001); // 1 token = 0.001 ETH
 
       console.log(`✔ Pago detectado: ${tokensComprados} tokens desde ${wallet}`);
 
       // Verificar reserva
-      const reserva = await axios.get(`${urlReserva}?wallet=${wallet}`);
-      const datosReserva = reserva.data;
+      let datosReserva;
+      try {
+        const respuesta = await axios.get(`${urlReserva}?wallet=${wallet}`);
+        datosReserva = respuesta.data;
+      } catch (err) {
+        console.warn(`⚠️ No se pudo consultar la reserva para ${wallet}.`);
+        continue;
+      }
 
       if (
         !datosReserva ||
@@ -55,7 +61,7 @@ async function obtenerTransacciones() {
         continue;
       }
 
-      // Enviar tokens
+      // Preparar y firmar transacción de tokens
       const cuenta = web3.eth.accounts.privateKeyToAccount(clavePrivada);
       const txData = contratoRB.methods.transfer(wallet, tokensComprados).encodeABI();
 
@@ -77,18 +83,22 @@ async function obtenerTransacciones() {
       console.log(`✔ Tokens enviados: TX ${receipt.transactionHash}`);
 
       // Registrar inversión en WordPress
-      const registrar = await axios.post(urlRegistro, {
-        wallet,
-        tokens: tokensComprados,
-        proyecto_id: parseInt(datosReserva.proyecto_id),
-        metodo_pago: "MetaMask",
-        tx_hash: receipt.transactionHash
-      });
+      try {
+        const registrar = await axios.post(urlRegistro, {
+          wallet,
+          tokens: tokensComprados,
+          proyecto_id: parseInt(datosReserva.proyecto_id),
+          metodo_pago: "MetaMask",
+          tx_hash: receipt.transactionHash
+        });
 
-      if (registrar.data.success) {
-        console.log("✅ Inversión registrada en WordPress.");
-      } else {
-        console.error("❌ Error al registrar inversión:", registrar.data);
+        if (registrar.data.success) {
+          console.log("✅ Inversión registrada en WordPress.");
+        } else {
+          console.error("❌ Error al registrar inversión:", registrar.data);
+        }
+      } catch (error) {
+        console.error("❌ Error al enviar tokens o registrar inversión:", error.message || error);
       }
     }
 
@@ -100,4 +110,4 @@ async function obtenerTransacciones() {
   }
 }
 
-setInterval(obtenerTransacciones, 15000); // cada 15 segundos
+setInterval(obtenerTransacciones, 15000); // Cada 15 segundos
